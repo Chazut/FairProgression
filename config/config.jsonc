@@ -1,0 +1,37 @@
+{
+  // FairProgression — Quest XP Rebalancer for SPT 4.0
+  // Automatically scales quest XP rewards to preserve the vanilla progression curve
+  // when modded quests are installed.
+
+  // Scaling mode:
+  //   "scale_all"         — reduce ALL quest XP proportionally (vanilla + modded)
+  //                         so the total XP per level bracket matches vanilla exactly.
+  //   "scale_modded_only" — only reduce modded quest XP, leave vanilla rewards untouched.
+  //                         Modded quests absorb the full reduction.
+  "mode": "scale_all",
+
+  // Level brackets for budget calculation.
+  // Each value is the upper bound of a bracket (inclusive).
+  // Quests are assigned to brackets based on their estimated completion level.
+  // Finer granularity for early levels (where trader unlocks matter most).
+  // Beyond level 50, all vanilla traders are LL4 so rebalancing is unnecessary.
+  // Quests estimated above the last bracket are left untouched.
+  "level_brackets": [5, 10, 15, 20, 25, 30, 40, 50],
+
+  // Minimum scaling coefficient. Prevents quest XP from being reduced below this ratio.
+  // e.g., 0.25 means quest XP will never drop below 25% of its original value.
+  "min_coefficient": 0.25,
+
+  // When true, prints a detailed dashboard in server logs showing:
+  //   - Detected modded quests and their source
+  //   - XP budget per bracket (vanilla vs actual vs scaled)
+  //   - Per-quest XP changes
+  "enable_dashboard": true,
+
+  // When true, calculates and logs everything but does NOT modify any quest rewards.
+  // Use this to preview the impact before applying changes.
+  "dry_run": false,
+
+  // Enable verbose per-quest logging (each quest's XP before/after).
+  "verbose": false
+}
