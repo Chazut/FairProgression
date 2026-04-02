@@ -28,6 +28,14 @@
   //   - Per-quest XP changes
   "enable_dashboard": true,
 
+  // Buff under-rewarded quests: when a quest's objectives are significantly harder
+  // than its XP reward suggests, increase the XP to match the difficulty.
+  // Uses the vanilla median XP for the estimated difficulty level as the target.
+  "buff_under_rewarded": true,
+
+  // Minimum level gap (difficultyLevel - xpLevel) to trigger a buff.
+  "buff_gap_threshold": 5,
+
   // When true, calculates and logs everything but does NOT modify any quest rewards.
   // Use this to preview the impact before applying changes.
   "dry_run": false,

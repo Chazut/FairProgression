@@ -79,17 +79,25 @@ public sealed class PostDb : IOnLoad
         // Compute brackets and coefficients
         var brackets = XPBudgetCalculator.ComputeBrackets(questInfos, config.LevelBrackets, config.MinCoefficient);
 
-        // Apply scaling
+        // Apply scaling (reduce over-rewarded)
         var modified = XPScaler.Apply(questInfos, brackets, quests, config.Mode, config.DryRun);
+
+        // Apply buff (increase under-rewarded)
+        var buffed = 0;
+        if (config.BuffUnderRewarded)
+        {
+            var vanillaXpPerLevel = QuestAnalyzer.BuildVanillaXpPerLevel(questInfos);
+            buffed = XPScaler.ApplyBuff(questInfos, quests, vanillaXpPerLevel, config.BuffGapThreshold, config.DryRun);
+        }
 
         // Dashboard
         if (config.EnableDashboard)
         {
-            Dashboard.Print(_logger, config, questInfos, brackets);
+            Dashboard.Print(_logger, config, questInfos, brackets, quests);
         }
 
         var action = config.DryRun ? "would modify" : "scaled";
-        _logger.Info($"[FairProgression] {action} {modified} quest XP rewards across {brackets.Count} brackets");
+        _logger.Info($"[FairProgression] {action} {modified} quest XP rewards, buffed {buffed} under-rewarded quests");
 
         return Task.CompletedTask;
     }

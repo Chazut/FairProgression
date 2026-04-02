@@ -82,6 +82,71 @@ public static class XPScaler
     /// Recalculate bracket after totals based on actual scaled values.
     /// Used for "scale_modded_only" mode where coefficients are not applied uniformly.
     /// </summary>
+    /// <summary>
+    /// Buff under-rewarded modded quests: when difficulty suggests a much higher level
+    /// than the XP reward, increase the XP to match the vanilla median for the difficulty level.
+    /// Returns the number of quests buffed.
+    /// </summary>
+    public static int ApplyBuff(
+        List<QuestInfo> quests,
+        Dictionary<MongoId, Quest> dbQuests,
+        List<(int medianXp, int level)> vanillaXpPerLevel,
+        int gapThreshold,
+        bool dryRun)
+    {
+        var buffed = 0;
+
+        foreach (var q in quests)
+        {
+            if (q.IsVanilla || q.OriginalXp <= 0)
+                continue;
+
+            var gap = q.LevelFromDifficulty - q.LevelFromXp;
+            if (gap < gapThreshold)
+                continue;
+
+            // Find the vanilla median XP for the difficulty-estimated level
+            var targetXp = LevelToXp(q.LevelFromDifficulty, vanillaXpPerLevel);
+            if (targetXp <= q.ScaledXp)
+                continue;
+
+            q.ScaledXp = targetXp;
+
+            if (!dryRun && dbQuests.TryGetValue(new MongoId(q.Id), out var dbQuest))
+            {
+                SetXpReward(dbQuest, targetXp);
+            }
+
+            buffed++;
+        }
+
+        return buffed;
+    }
+
+    /// <summary>
+    /// Find the vanilla median XP for a given level.
+    /// Uses the closest matching level from the vanilla XP mapping.
+    /// </summary>
+    private static int LevelToXp(int level, List<(int medianXp, int level)> vanillaXpPerLevel)
+    {
+        if (vanillaXpPerLevel.Count == 0) return 0;
+
+        var bestXp = vanillaXpPerLevel[0].medianXp;
+        var bestDiff = int.MaxValue;
+
+        foreach (var (medianXp, lvl) in vanillaXpPerLevel)
+        {
+            var diff = Math.Abs(level - lvl);
+            if (diff < bestDiff)
+            {
+                bestDiff = diff;
+                bestXp = medianXp;
+            }
+        }
+
+        return bestXp;
+    }
+
     private static void RecalcBracketTotals(List<QuestInfo> quests, List<BracketSummary> brackets)
     {
         foreach (var bracket in brackets)

@@ -14,6 +14,8 @@ public sealed class QuestInfo
     public int OriginalXp { get; set; }
     public int ScaledXp { get; set; }
     public int DifficultyScore { get; set; }
+    public int LevelFromXp { get; set; }
+    public int LevelFromDifficulty { get; set; }
     public int EstimatedCompletionLevel { get; set; }
     public int PrerequisiteDepth { get; set; }
     public int BracketIndex { get; set; }

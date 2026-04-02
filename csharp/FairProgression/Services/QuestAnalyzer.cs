@@ -312,7 +312,7 @@ public static class QuestAnalyzer
     /// Build a sorted list of (medianXP, level) from vanilla quests to map XP → level.
     /// Groups vanilla quests by their minLevel and computes the median XP for each level.
     /// </summary>
-    private static List<(int medianXp, int level)> BuildVanillaXpPerLevel(List<QuestInfo> quests)
+    public static List<(int medianXp, int level)> BuildVanillaXpPerLevel(List<QuestInfo> quests)
     {
         var byLevel = new Dictionary<int, List<int>>();
         foreach (var q in quests.Where(q => q.IsVanilla && q.OriginalXp > 0 && q.MinLevel > 0))
@@ -358,6 +358,9 @@ public static class QuestAnalyzer
         var levelFromDifficulty = quest.DifficultyScore > 0
             ? DifficultyEstimator.DifficultyToLevel(quest.DifficultyScore)
             : 1;
+
+        quest.LevelFromXp = levelFromXp;
+        quest.LevelFromDifficulty = levelFromDifficulty;
 
         // Take the max of both estimates
         var level = Math.Max(levelFromXp, levelFromDifficulty);

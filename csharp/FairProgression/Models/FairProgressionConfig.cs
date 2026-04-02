@@ -19,6 +19,12 @@ public sealed class FairProgressionConfig
     [JsonPropertyName("dry_run")]
     public bool DryRun { get; set; }
 
+    [JsonPropertyName("buff_under_rewarded")]
+    public bool BuffUnderRewarded { get; set; } = true;
+
+    [JsonPropertyName("buff_gap_threshold")]
+    public int BuffGapThreshold { get; set; } = 5;
+
     [JsonPropertyName("verbose")]
     public bool Verbose { get; set; }
 }
