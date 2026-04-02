@@ -13,11 +13,11 @@ FairProgression runs **after** all other mods have loaded and:
 1. **Identifies** which quests are vanilla and which are modded (by comparing the in-memory database against the on-disk vanilla quest file)
 2. **Estimates** at which level each quest will realistically be completed, using:
    - XP reward amount mapped against vanilla quest distributions
-   - Objective difficulty analysis (kill targets, boss fights, hideout requirements, etc.)
-   - Prerequisite chain depth propagation
-   - Parallel chain XP accumulation (e.g., 20 quest themes played simultaneously)
-3. **Scales down** over-rewarded quests: assigns quests to level brackets and computes a scaling coefficient per bracket so the total quest XP matches the vanilla budget
-4. **Buffs up** under-rewarded quests: when a quest's objectives are significantly harder than its XP reward suggests, increases the XP to match the vanilla median for that difficulty level
+   - Objective difficulty analysis (kill targets, boss fights, hideout requirements, map difficulty, etc.)
+   - Prerequisite chain depth propagation (vanilla + modded)
+   - Parallel chain XP accumulation per trader (e.g., 20 quest themes played simultaneously)
+3. **Buffs up** under-rewarded quests first: when a quest's objectives are significantly harder than its XP reward suggests, increases the XP to match (capped at x2)
+4. **Scales down** over-rewarded quests: assigns quests to level brackets aligned with trader loyalty unlocks and computes a scaling coefficient per bracket so the total quest XP matches the vanilla budget
 5. **Logs** a detailed dashboard of all changes
 
 ## Installation
@@ -38,16 +38,19 @@ Edit `config/config.jsonc`:
   // "scale_modded_only" — only reduce modded quest XP
   "mode": "scale_all",
 
-  // Level brackets for budget calculation
-  "level_brackets": [5, 10, 15, 20, 25, 30, 40, 50],
+  // Level brackets for XP budget calculation.
+  //   "trader" — auto-compute from vanilla trader loyalty level requirements
+  //              (e.g., [12, 20, 32, 42] based on LL2/LL3/LL4 unlock levels)
+  //   [5, 10, ...] — manual JSON array of bracket upper bounds
+  "level_brackets": "trader",
 
   // Minimum scaling coefficient (never reduce below this ratio)
   "min_coefficient": 0.25,
 
-  // Buff under-rewarded quests (difficulty >> XP reward)
+  // Buff under-rewarded quests (difficulty >> XP reward), capped at x2
   "buff_under_rewarded": true,
 
-  // Minimum level gap to trigger a buff
+  // Minimum level gap (difficultyLevel - xpLevel) to trigger a buff
   "buff_gap_threshold": 5,
 
   // Print detailed dashboard in server logs
@@ -69,28 +72,36 @@ Edit `config/config.jsonc`:
 [FairProgression]  Mode: scale_all
 [FairProgression] ================================================================
 [FairProgression]  Quests: 1492 total (558 vanilla, 934 modded)
-[FairProgression]  Vanilla quest XP: 11.0M -> 8.3M (-24.3%)
-[FairProgression]  Modded  quest XP: 24.3M -> 19.7M (-18.6%)
+[FairProgression]  Vanilla quest XP: 11.0M -> 7.9M (-27.6%)
+[FairProgression]  Modded  quest XP: 24.6M -> 21.4M (-13.1%)
 [FairProgression]
 [FairProgression]  Bracket  Van.Q   Van.XP  Mod.Q   Mod.XP    Total  Coeff     After
 [FairProgression]  -------  -----   ------  -----   ------    -----  -----     -----
-[FairProgression]  1-5        347     6.1M     98    101.2k     6.2M  0.984      6.1M
-[FairProgression]  6-10        27   136.7k     94    240.9k   377.6k  0.362    136.7k
-[FairProgression]  11-15       52   402.2k    171    820.2k     1.2M  0.329    402.2k
-[FairProgression]  16-20       33   400.2k     85    421.5k   821.7k  0.487    400.2k
-[FairProgression]  21-25       33   547.0k     97    834.9k     1.4M  0.396    547.0k
-[FairProgression]  26-30       23   489.6k    114      1.6M     2.1M  0.250    530.1k
-[FairProgression]  31-40       25   683.4k    136      3.8M     4.5M  0.250      1.1M
-[FairProgression]  41-50       11     1.3M     31      2.0M     3.3M  0.386      1.3M
-[FairProgression]  51+          7   950.5k    108     14.3M    15.3M    ---     15.3M
+[FairProgression]  1-12       167     2.0M    117    256.1k     2.2M  0.885      2.0M
+[FairProgression]  13-20      145     1.8M    116    578.2k     2.4M  0.754      1.8M
+[FairProgression]  21-32      151     3.2M    193      2.1M     5.3M  0.603      3.2M
+[FairProgression]  33-42       55     1.7M    137      3.3M     5.0M  0.334      1.7M
+[FairProgression]  43+         40     2.4M    371     18.4M    20.8M    ---     20.8M
 [FairProgression]
-[FairProgression]  Buffed 238 under-rewarded quests (+1.5M XP)
+[FairProgression]  Buffed 185 under-rewarded quests (+369.0k XP)
 [FairProgression]
-[FairProgression]  Total quest XP: 35.2M -> 28.1M (-20.3%)
+[FairProgression]  Total quest XP: 35.6M -> 29.3M (-17.5%)
 [FairProgression] ================================================================
 ```
 
 ## How It Works
+
+### Trader-Aligned Level Brackets
+
+By default (`"level_brackets": "trader"`), brackets are auto-computed from vanilla trader loyalty level requirements:
+
+| Bracket | Phase | Trader unlocks |
+|---|---|---|
+| 1-12 | Early game | Before any LL2 |
+| 13-20 | LL2 phase | Therapist 13, Peacekeeper 14, Prapor/Skier/Jaeger 15, Ragman 17, Mechanic 20 |
+| 21-32 | LL3 phase | Jaeger 22, Peacekeeper/Therapist 23-24, Prapor 26, Skier 28, Mechanic 30, Ragman 32 |
+| 33-42 | LL4 phase | Jaeger 33, Therapist/Prapor/Skier 35-38, Mechanic 40, Ragman 42 |
+| 43+ | Endgame | All traders LL4 — no scaling applied |
 
 ### Quest Level Estimation
 
@@ -99,8 +110,8 @@ Each quest's "estimated completion level" is the **maximum** of four signals:
 | Signal | Description |
 |---|---|
 | **XP reward** | Mapped against vanilla quest XP medians per level |
-| **Difficulty score** | Analyzed from quest objectives (kill count, target type, restrictions, hideout requirements, etc.) |
-| **Prerequisite propagation** | Each quest >= max(prereq levels) + 1 |
+| **Difficulty score** | Analyzed from quest objectives (kill count, target type, restrictions, map difficulty, etc.) |
+| **Prerequisite propagation** | Each quest >= max(prereq levels) + 1, applied to vanilla and modded quests |
 | **Parallel chain boost** | Cumulative XP from parallel chains within the same trader, converted to a level floor via the exp table |
 
 ### Difficulty Scoring
@@ -110,7 +121,10 @@ Quest objectives are scored by analyzing the `AvailableForFinish` conditions:
 - **Kill scavs**: 3 + sqrt(count) x 2 (easy)
 - **Kill PMCs**: 7 + sqrt(count) x 2 (moderate)
 - **Kill bosses**: 18 + sqrt(count) x 2 (hard)
-- **Kill restrictions** (headshot, distance, weapon, map, night): multiplier +10-25% each
+- **Kill restrictions** (headshot, distance, weapon, equipment, night): multiplier +10-25% each
+- **Map difficulty**: Labs +50%, Lighthouse/Labyrinth +30%
+- **Zone restriction**: +20% (may require keys)
+- **One raid (OneSessionOnly)**: +15-100% scaled by base difficulty (kill 20 PMC headshots >> visit 6 zones)
 - **Handover items**: 3 + count x 1.5 (FIR: x1.4), money handovers = trivial
 - **Hideout area**: 8/18/28 for level 1/2/3+
 - **Trader loyalty**: 5/12/25/38 for LL1/2/3/4
@@ -121,7 +135,7 @@ Quest objectives are scored by analyzing the `AvailableForFinish` conditions:
 
 ### Under-Rewarded Buff
 
-When a quest's difficulty-estimated level exceeds its XP-estimated level by more than the threshold (default: 5 levels), the XP is increased to the vanilla median for the difficulty level. This ensures hard quests are properly rewarded even if the modder set a low XP value.
+When a quest's difficulty-estimated level exceeds its XP-estimated level by more than the threshold (default: 5 levels), the XP is increased to the vanilla median for the midpoint level. The buff is capped at x2 the original XP to avoid extreme jumps. Buffs are applied **before** bracket computation so they are included in the XP budget.
 
 ### Safe for Existing Profiles
 

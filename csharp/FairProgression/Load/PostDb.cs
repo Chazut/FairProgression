@@ -55,12 +55,14 @@ public sealed class PostDb : IOnLoad
         }
         catch { /* locale resolution is best-effort */ }
 
+        // Resolve SPT root path for disk-based lookups
+        var asmDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
+        var sptRoot = Path.GetFullPath(Path.Combine(asmDir, "..", "..", ".."));
+
         // Load exp_table from globals.json on disk for parallel chain boost
         List<int>? expTable = null;
         try
         {
-            var asmDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
-            var sptRoot = Path.GetFullPath(Path.Combine(asmDir, "..", "..", ".."));
             var globalsPath = Path.Combine(sptRoot, "SPT_Data", "database", "globals.json");
             expTable = ExpTableLoader.LoadFromFile(globalsPath);
         }
@@ -76,19 +78,23 @@ public sealed class PostDb : IOnLoad
             return Task.CompletedTask;
         }
 
-        // Compute brackets and coefficients
-        var brackets = XPBudgetCalculator.ComputeBrackets(questInfos, config.LevelBrackets, config.MinCoefficient);
-
-        // Apply scaling (reduce over-rewarded)
-        var modified = XPScaler.Apply(questInfos, brackets, quests, config.Mode, config.DryRun);
-
-        // Apply buff (increase under-rewarded)
+        // Buff under-rewarded quests BEFORE computing brackets,
+        // so the buffed XP is included in the budget calculation
         var buffed = 0;
         if (config.BuffUnderRewarded)
         {
             var vanillaXpPerLevel = QuestAnalyzer.BuildVanillaXpPerLevel(questInfos);
             buffed = XPScaler.ApplyBuff(questInfos, quests, vanillaXpPerLevel, config.BuffGapThreshold, config.DryRun);
         }
+
+        // Resolve level brackets (from trader loyalty levels or manual config)
+        var levelBrackets = BracketResolver.Resolve(config.LevelBrackets, sptRoot);
+
+        // Compute brackets and coefficients (now includes buffed XP)
+        var brackets = XPBudgetCalculator.ComputeBrackets(questInfos, levelBrackets, config.MinCoefficient);
+
+        // Apply scaling (reduce over-rewarded)
+        var modified = XPScaler.Apply(questInfos, brackets, quests, config.Mode, config.DryRun);
 
         // Dashboard
         if (config.EnableDashboard)

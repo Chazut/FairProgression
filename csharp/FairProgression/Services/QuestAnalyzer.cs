@@ -155,12 +155,65 @@ public static class QuestAnalyzer
         var ids = new List<string>();
         foreach (var cond in quest.Conditions.AvailableForStart)
         {
-            if (cond.ConditionType == "Quest" && cond.Target?.List != null)
+            if (cond.ConditionType != "Quest") continue;
+
+            var target = cond.Target;
+            if (target == null) continue;
+
+            // ListOrT can hold a list OR a single value
+            if (target.List is { Count: > 0 })
             {
-                ids.AddRange(cond.Target.List);
+                ids.AddRange(target.List);
+                continue;
             }
+
+            // For single string targets: try all known approaches
+            // 1. Try IEnumerable
+            if (target is IEnumerable<string> enumerable)
+            {
+                ids.AddRange(enumerable);
+                continue;
+            }
+
+            // 2. Try implicit/explicit string conversion or known properties via reflection (one-time discovery)
+            var targetStr = ExtractSingleTarget(target);
+            if (targetStr != null)
+                ids.Add(targetStr);
         }
         return ids;
+    }
+
+    private static string? ExtractSingleTarget(object target)
+    {
+        var type = target.GetType();
+
+        // Try all string properties that might hold the value
+        foreach (var prop in type.GetProperties())
+        {
+            if (prop.PropertyType != typeof(string)) continue;
+            try
+            {
+                var val = prop.GetValue(target) as string;
+                if (!string.IsNullOrEmpty(val) && val.Length >= 20)
+                    return val;
+            }
+            catch { }
+        }
+
+        // Try all string fields
+        foreach (var field in type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))
+        {
+            if (field.FieldType != typeof(string))  continue;
+            try
+            {
+                var val = field.GetValue(target) as string;
+                if (!string.IsNullOrEmpty(val) && val.Length >= 20)
+                    return val;
+            }
+            catch { }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -342,9 +395,18 @@ public static class QuestAnalyzer
     private static int EstimateCompletionLevel(QuestInfo quest, Dictionary<string, QuestInfo> lookup,
         List<(int medianXp, int level)> vanillaXpPerLevel)
     {
-        // Vanilla quests: trust their minLevel
+        // Vanilla quests: use minLevel as base, but also check prereqs — many vanilla
+        // quests have minLevel=1-2 but require completing quests that need higher levels
         if (quest.IsVanilla)
-            return Math.Max(1, quest.MinLevel);
+        {
+            var vanillaLevel = Math.Max(1, quest.MinLevel);
+            foreach (var prereqId in quest.PrerequisiteQuestIds)
+            {
+                if (lookup.TryGetValue(prereqId, out var prereq))
+                    vanillaLevel = Math.Max(vanillaLevel, prereq.EstimatedCompletionLevel + 1);
+            }
+            return vanillaLevel;
+        }
 
         // Modded quests with an explicit minLevel > 1: use it
         if (quest.MinLevel > 1)

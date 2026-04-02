@@ -105,17 +105,22 @@ public static class XPScaler
             if (gap < gapThreshold)
                 continue;
 
-            // Find the vanilla median XP for the difficulty-estimated level
-            var targetXp = LevelToXp(q.LevelFromDifficulty, vanillaXpPerLevel);
-            if (targetXp <= q.ScaledXp)
+            // Use midpoint between XP level and difficulty level as target
+            // (not the full difficulty level — avoids over-buffing)
+            var midLevel = (q.LevelFromXp + q.LevelFromDifficulty) / 2;
+            var targetXp = LevelToXp(midLevel, vanillaXpPerLevel);
+
+            // Cap: never more than 2x the original XP
+            targetXp = Math.Min(targetXp, q.OriginalXp * 2);
+
+            if (targetXp <= q.OriginalXp)
                 continue;
 
+            // Buff runs before scaling — update OriginalXp so brackets account for it.
+            // ScaledXp will be set later by Apply().
+            q.PreBuffXp = q.OriginalXp;
+            q.OriginalXp = targetXp;
             q.ScaledXp = targetXp;
-
-            if (!dryRun && dbQuests.TryGetValue(new MongoId(q.Id), out var dbQuest))
-            {
-                SetXpReward(dbQuest, targetXp);
-            }
 
             buffed++;
         }

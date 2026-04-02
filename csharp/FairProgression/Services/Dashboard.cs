@@ -65,10 +65,10 @@ public static class Dashboard
         }
 
         // Buffed quests summary
-        var buffedQuests = quests.Where(q => !q.IsVanilla && q.ScaledXp > q.OriginalXp).ToList();
+        var buffedQuests = quests.Where(q => !q.IsVanilla && q.PreBuffXp > 0).ToList();
         if (buffedQuests.Count > 0)
         {
-            var buffedXpAdded = buffedQuests.Sum(q => (long)(q.ScaledXp - q.OriginalXp));
+            var buffedXpAdded = buffedQuests.Sum(q => (long)(q.OriginalXp - q.PreBuffXp));
             logger.Info($"{Tag} {"",1}");
             logger.Info($"{Tag}  Buffed {buffedQuests.Count} under-rewarded quests (+{FormatXp(buffedXpAdded)} XP)");
         }
@@ -122,16 +122,17 @@ public static class Dashboard
             logger.Info($"{Tag} ================================================================");
             logger.Info($"{Tag}  Under-rewarded quests ({underRewarded.Count}):");
             logger.Info($"{Tag}  Quests where difficulty suggests a higher level than XP reward.");
-            logger.Info($"{Tag}  {"Quest",-45} {"Trader",-12} {"XP",6} {"XpLvl",6} {"DiffLvl",8} {"Gap",4}");
-            logger.Info($"{Tag}  {"-----",-45} {"------",-12} {"--",6} {"-----",6} {"-------",8} {"---",4}");
+            logger.Info($"{Tag}  {"Quest",-40} {"Trader",-12} {"Buff",12} {"XpLvl",6} {"DiffLvl",8} {"Gap",4}");
+            logger.Info($"{Tag}  {"-----",-40} {"------",-12} {"----",12} {"-----",6} {"-------",8} {"---",4}");
 
             foreach (var q in underRewarded)
             {
-                var name = q.Name.Length > 45 ? q.Name[..42] + "..." : q.Name;
+                var name = q.Name.Length > 40 ? q.Name[..37] + "..." : q.Name;
                 var trader = q.TraderName.Length > 12 ? q.TraderName[..9] + "..." : q.TraderName;
                 var gap = q.LevelFromDifficulty - q.LevelFromXp;
+                var buffedStr = q.PreBuffXp > 0 ? $"{q.PreBuffXp,4}->{q.OriginalXp}" : $"{"---",7}";
                 logger.Info(
-                    $"{Tag}  {name,-45} {trader,-12} {q.OriginalXp,6} {q.LevelFromXp,6} " +
+                    $"{Tag}  {name,-40} {trader,-12} {buffedStr,12} {q.LevelFromXp,6} " +
                     $"{q.LevelFromDifficulty,8} {$"+{gap}",4}");
 
                 // Show objectives if DB quests are available

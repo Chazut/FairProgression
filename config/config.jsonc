@@ -10,13 +10,13 @@
   //                         Modded quests absorb the full reduction.
   "mode": "scale_all",
 
-  // Level brackets for budget calculation.
-  // Each value is the upper bound of a bracket (inclusive).
-  // Quests are assigned to brackets based on their estimated completion level.
-  // Finer granularity for early levels (where trader unlocks matter most).
-  // Beyond level 50, all vanilla traders are LL4 so rebalancing is unnecessary.
+  // Level brackets for XP budget calculation.
+  //   "trader" — auto-compute from vanilla trader loyalty level requirements.
+  //              Creates brackets aligned with LL2/LL3/LL4 unlock phases:
+  //              [13, 20, 32, 42] (based on actual trader minLevel values)
+  //   [5, 10, ...] — manual JSON array of bracket upper bounds.
   // Quests estimated above the last bracket are left untouched.
-  "level_brackets": [5, 10, 15, 20, 25, 30, 40, 50],
+  "level_brackets": "trader",
 
   // Minimum scaling coefficient. Prevents quest XP from being reduced below this ratio.
   // e.g., 0.25 means quest XP will never drop below 25% of its original value.

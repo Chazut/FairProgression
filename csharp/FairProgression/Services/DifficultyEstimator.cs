@@ -111,15 +111,38 @@ public static class DifficultyEstimator
         if (type is "Elimination" or "Kills")
             return ScoreKills(cond, count);
 
+        // For non-kill counters, check for map/zone difficulty bonus
+        var mapBonus = GetCounterMapBonus(cond);
         if (type == "Exploration")
-            return 5.0 + Math.Min(count, 10) * 1.5;
+        {
+            var score = (5.0 + Math.Min(count, 10) * 1.5) * (1 + mapBonus);
+            if (cond.OneSessionOnly == true) score *= 1 + SessionBonus(score);
+            return score;
+        }
 
         if (type == "Discover")
             return 3.0;
 
         // Generic completion (survive, extract, health effects, etc.)
         var effectiveCount = count > 30 ? 5.0 + Math.Log2(count / 30.0) * 1.5 : (double)count;
-        return 3.0 + Math.Min(effectiveCount, 15) * 1.0;
+        var genScore = (3.0 + Math.Min(effectiveCount, 15) * 1.0) * (1 + mapBonus);
+        if (cond.OneSessionOnly == true) genScore *= 1 + SessionBonus(genScore);
+        return genScore;
+    }
+
+    /// <summary>
+    /// Extract map difficulty bonus from a counter condition's Location sub-conditions.
+    /// </summary>
+    private static double GetCounterMapBonus(QuestCondition cond)
+    {
+        if (cond.Counter?.Conditions == null) return 0;
+        var bonus = 0.0;
+        foreach (var cc in cond.Counter.Conditions)
+        {
+            if (cc.ConditionType == "Location" && cc.Target?.List is { Count: > 0 })
+                bonus = Math.Max(bonus, cc.Target.List.Max(m => GetMapDifficulty(m)));
+        }
+        return bonus;
     }
 
     /// <summary>
@@ -147,11 +170,14 @@ public static class DifficultyEstimator
 
         var targetIsPmc = false;
         var targetIsBoss = false;
-        var hasLocationRestriction = false;
         var hasBodyPartRestriction = false;
         var hasDistanceRestriction = false;
         var hasWeaponRestriction = false;
         var hasTimeRestriction = false;
+        var hasEquipmentRestriction = false;
+        var mapDifficulty = 0.0;
+        var hasZoneRestriction = false;
+        var mapCount = 0;
 
         if (cond.Counter?.Conditions != null)
         {
@@ -159,7 +185,6 @@ public static class DifficultyEstimator
             {
                 if (cc.ConditionType == "Kills")
                 {
-                    // Skip QE placeholder distance
                     if (cc.Distance?.Value >= QePlaceholderDistance)
                         return 1.0;
 
@@ -184,9 +209,22 @@ public static class DifficultyEstimator
                     if (cc.Daytime != null)
                         hasTimeRestriction = true;
                 }
-                else if (cc.ConditionType is "Location" or "InZone")
+                else if (cc.ConditionType == "Location")
                 {
-                    hasLocationRestriction = true;
+                    var maps = cc.Target?.List;
+                    if (maps is { Count: > 0 })
+                    {
+                        mapCount = maps.Count;
+                        mapDifficulty = maps.Max(m => GetMapDifficulty(m));
+                    }
+                }
+                else if (cc.ConditionType == "InZone")
+                {
+                    hasZoneRestriction = true;
+                }
+                else if (cc.ConditionType == "Equipment")
+                {
+                    hasEquipmentRestriction = true;
                 }
             }
         }
@@ -204,11 +242,59 @@ public static class DifficultyEstimator
         if (hasBodyPartRestriction) multiplier += 0.25;
         if (hasDistanceRestriction) multiplier += 0.25;
         if (hasWeaponRestriction) multiplier += 0.15;
-        if (hasLocationRestriction) multiplier += 0.10;
         if (hasTimeRestriction) multiplier += 0.10;
-        if (cond.OneSessionOnly == true) multiplier += 0.4;
+        if (hasEquipmentRestriction) multiplier += 0.15;
 
-        return Math.Min(baseScore * multiplier, 50);
+        // Map difficulty: hard maps add a significant multiplier
+        multiplier += mapDifficulty;
+
+        // Zone restriction: specific zones are harder (may require keys)
+        if (hasZoneRestriction) multiplier += 0.20;
+
+        // Multiple maps: need to visit several maps to complete
+        if (mapCount > 1) multiplier += 0.05 * (mapCount - 1);
+
+        var killScore = baseScore * multiplier;
+
+        // OneSessionOnly: bonus scales with how hard the condition already is
+        if (cond.OneSessionOnly == true)
+            killScore *= 1 + SessionBonus(killScore);
+
+        return Math.Min(killScore, 50);
+    }
+
+    /// <summary>
+    /// Map difficulty ratings. Returns a multiplier bonus (added to the kill multiplier).
+    /// Labs requires a keycard to enter and is the hardest PvE content.
+    /// Lighthouse has rogues. Streets is dangerous. Reserve has raiders.
+    /// </summary>
+    /// <summary>
+    /// OneSessionOnly bonus based on the base score of the condition (before session multiplier).
+    /// The harder the condition already is, the more OneSessionOnly amplifies it.
+    /// A "kill 2 scavs in 1 raid" (base ~6) gets a small bonus,
+    /// while "20 PMC headshots in 1 raid" (base ~18) gets a huge bonus.
+    /// </summary>
+    private static double SessionBonus(double baseScore)
+    {
+        return baseScore switch
+        {
+            <= 5 => 0.15,   // trivial in one raid (visit zones, kill 1-2 scavs)
+            <= 10 => 0.30,  // moderate (kill a few targets with restrictions)
+            <= 20 => 0.50,  // hard (PMC kills, boss kills, many targets)
+            <= 30 => 0.75,  // very hard
+            _ => 1.00       // extreme
+        };
+    }
+
+    private static double GetMapDifficulty(string locationId)
+    {
+        return locationId switch
+        {
+            "laboratory" or "5b0fc42d86f7744a585f9105" => 0.50, // Labs — requires keycard, hardest map
+            "Lighthouse" => 0.30, // Rogues, hard AI
+            "Labyrinth" => 0.30, // Hard PvE content
+            _ => 0.0
+        };
     }
 
     private static double ScoreHideout(QuestCondition cond)

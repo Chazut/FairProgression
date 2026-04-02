@@ -11,6 +11,7 @@ public sealed class QuestInfo
     public string TraderName { get; set; } = "Unknown";
     public bool IsVanilla { get; set; }
     public int MinLevel { get; set; }
+    public int PreBuffXp { get; set; }
     public int OriginalXp { get; set; }
     public int ScaledXp { get; set; }
     public int DifficultyScore { get; set; }
