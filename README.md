@@ -22,11 +22,9 @@ FairProgression runs **after** all other mods have loaded and:
 
 ## Installation
 
-1. Build with `dotnet build csharp/FairProgression/FairProgression.csproj -c Release`
-2. Copy `FairProgression.dll` and the `config/` folder to `SPT/user/mods/FairProgression/`
-3. Start the SPT server — FairProgression runs automatically
+Extract the release zip in your SPT folder (root). Start the server.
 
-Or just drop the release zip into your `user/mods/` folder.
+To build from source: `dotnet build csharp/FairProgression/FairProgression.csproj -c Release`
 
 ## Configuration
 
