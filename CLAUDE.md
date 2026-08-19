@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## What This Is
 
-An SPT (Single Player Tarkov) 4.0 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed. Prevents over-leveling from modded quest XP while keeping the vanilla experience intact.
+An SPT 4.1 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed. Prevents over-leveling from modded quest XP while keeping the vanilla experience intact.
 
 ## Build Commands
 
@@ -23,8 +23,8 @@ SPT assemblies are referenced via `SPT_DIR` HintPath — the build will fail if 
 **Framework:** .NET 9.0 targeting SPT 4.0's DI system. Classes use `[Injectable(TypePriority = ...)]` for auto-discovery and ordering.
 
 **Lifecycle (two stages):**
-1. `CaptureVanilla` (priority: `OnLoadOrder.Database + 5`) — captures vanilla quest IDs before any mod adds quests
-2. `PostDb` (priority: `OnLoadOrder.Database + 999`) — runs AFTER all other mods, analyzes quests, computes scaling, applies changes
+1. `CaptureVanilla` (priority: `OnLoadOrder.Preload + 5`) — captures vanilla quest IDs before any mod adds quests
+2. `PostDb` (priority: `OnLoadOrder.PostLoad + 999`) — runs AFTER all other mods, analyzes quests, computes scaling, applies changes
 
 **Services:**
 - **VanillaQuestSnapshot** — static set of vanilla quest IDs captured before mods load

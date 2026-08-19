@@ -1,41 +1,44 @@
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
+using SPTarkov.Common.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Server.Core.Services.Locales;
 using FairProgression.Services;
 
 namespace FairProgression.Load;
 
 /// <summary>
-/// Main orchestrator. Runs in the PostSptModLoader phase — the very last phase —
+/// Main orchestrator. Runs in the PostLoad phase — the very last named phase in 4.1 —
 /// to ensure ALL mods have finished adding their quests.
-/// Phase order: Database (200k) → PostDBModLoader (400k) → ... → PostSptModLoader (1.1M)
+/// 4.1 phase order: Preload (100k) → GameCallbacks (200k) → ... → PostLoad (1M).
+/// PostLoad + 999 keeps the old "after everyone else" contract: quest-injecting mods
+/// run at lower offsets (e.g. TTC injects its quests at PostLoad + 50, MissionControl
+/// runs at PostLoad + 100), so their quests are in the DB before we rebalance.
+/// A mod could still register beyond PostLoad + 999 (TypePriority is an open int),
+/// but the same held for PostSptModLoader + N in 4.0.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PostSptModLoader + 50)]
+[Injectable(TypePriority = OnLoadOrder.PostLoad + 999)]
 public sealed class PostDb : IOnLoad
 {
     private readonly ISptLogger<PostDb> _logger;
-    private readonly DatabaseService _db;
+    private readonly TemplateTable _templates;
+    private readonly LocaleService _localeService;
 
-    public PostDb(ISptLogger<PostDb> logger, DatabaseService db)
+    public PostDb(ISptLogger<PostDb> logger, TemplateTable templates, LocaleService localeService)
     {
         _logger = logger;
-        _db = db;
+        _templates = templates;
+        _localeService = localeService;
     }
 
-    public Task OnLoad()
+    public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         // Load config
         var configDir = ConfigLoader.GetConfigDir();
         var configPath = Path.Combine(configDir, "config.jsonc");
         var config = ConfigLoader.Load(configPath);
 
-        var quests = _db.GetTables().Templates?.Quests;
-        if (quests == null)
-        {
-            _logger.Warning("[FairProgression] Could not access quest database — aborting");
-            return Task.CompletedTask;
-        }
+        var quests = _templates.Quests;
 
         if (VanillaQuestSnapshot.Ids.Count == 0)
         {
@@ -47,11 +50,7 @@ public sealed class PostDb : IOnLoad
         Dictionary<string, string>? locales = null;
         try
         {
-            var serverLocales = _db.GetLocales();
-            if (serverLocales?.Global?.TryGetValue("en", out var lazyEn) == true)
-            {
-                locales = lazyEn.Value;
-            }
+            locales = _localeService.GetLocaleDb("en");
         }
         catch { /* locale resolution is best-effort */ }
 
