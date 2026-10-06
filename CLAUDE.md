@@ -4,13 +4,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## What This Is
 
-An SPT 4.1 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed. Prevents over-leveling from modded quest XP while keeping the vanilla experience intact.
+An SPT 4.1.6 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed. Prevents over-leveling from modded quest XP while keeping the vanilla experience intact.
 
 ## Build Commands
 
 ```bash
-# Requires SPT_DIR environment variable pointing to SPT 4.0 server root
-# e.g., export SPT_DIR="C:/Games/SPT-4.0/SPT"
+# Requires SPT_DIR environment variable pointing to the SPT 4.1.6 SPT_Runtime folder
+# e.g., export SPT_DIR="C:/Games/SPT-4.1/SPT_Runtime"
 
 # Build the mod
 dotnet build csharp/FairProgression/FairProgression.csproj -c Release
@@ -18,9 +18,11 @@ dotnet build csharp/FairProgression/FairProgression.csproj -c Release
 
 SPT assemblies are referenced via `SPT_DIR` HintPath — the build will fail if the env var is unset or the assemblies are missing.
 
+You can also pass `-p:SPT_DIR="C:/Games/SPT-4.1/SPT_Runtime"` to the build command. Deployment is opt-in via `-p:DeployOnBuild=true` and replaces the DLL and config in an existing installation. Release builds and validation should leave it disabled.
+
 ## Architecture
 
-**Framework:** .NET 9.0 targeting SPT 4.0's DI system. Classes use `[Injectable(TypePriority = ...)]` for auto-discovery and ordering.
+**Framework:** .NET 10.0 targeting SPT 4.1's DI system. Classes use `[Injectable(TypePriority = ...)]` for auto-discovery and ordering.
 
 **Lifecycle (two stages):**
 1. `CaptureVanilla` (priority: `OnLoadOrder.Preload + 5`) — captures vanilla quest IDs before any mod adds quests

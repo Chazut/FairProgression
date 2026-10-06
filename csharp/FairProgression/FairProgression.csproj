@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <SPT_DIR>C:\Games\SPT-4.1\SPT_Runtime</SPT_DIR>
+    <DeployOnBuild Condition="'$(DeployOnBuild)' == ''">false</DeployOnBuild>
   </PropertyGroup>
 
   <!-- Copy config folder into Release output -->
@@ -22,7 +22,7 @@
     </None>
   </ItemGroup>
 
-  <!-- SPT 4.1 server references -->
+  <!-- SPT 4.1.6 server references (SPT_DIR points to SPT_Runtime) -->
   <ItemGroup Condition="'$(SPT_DIR)' != ''">
     <Reference Include="SPTarkov.Server.Core">
       <HintPath>$(SPT_DIR)\SPTarkov.Server.Core.dll</HintPath>
@@ -47,21 +47,22 @@
   </ItemGroup>
 
   <!-- Require SPT_DIR -->
-  <Target Name="EnsureSptDirProvided" BeforeTargets="Build">
+  <Target Name="EnsureSptDirProvided" BeforeTargets="ResolveAssemblyReferences">
     <Error Condition="'$(SPT_DIR)' == ''" Text="SPT_DIR must be set (path to SPT server DLLs) to build this project." />
+    <Error Condition="'$(SPT_DIR)' != '' and !Exists('$(SPT_DIR)\SPTarkov.Server.Core.dll')" Text="SPT_DIR must point to the SPT 4.1.6 SPT_Runtime folder containing the server DLLs." />
   </Target>
 
-  <!-- Deploy mod to SPT after build -->
+  <!-- Optional deployment; regular builds leave the installed mod and config untouched. -->
   <PropertyGroup>
     <ModDeployDir>$(SPT_DIR)\user\mods\FairProgression</ModDeployDir>
   </PropertyGroup>
 
-  <Target Name="DeployMod" AfterTargets="Build" Condition="Exists('$(ModDeployDir)')">
+  <Target Name="DeployMod" AfterTargets="Build" Condition="'$(DeployOnBuild)' == 'true' and Exists('$(ModDeployDir)')">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDeployDir)" SkipUnchangedFiles="true" />
     <Message Importance="high" Text="[FairProgression] Deployed DLL to $(ModDeployDir)" />
   </Target>
 
-  <Target Name="DeployModAssets" AfterTargets="Build" Condition="Exists('$(ModDeployDir)')">
+  <Target Name="DeployModAssets" AfterTargets="Build" Condition="'$(DeployOnBuild)' == 'true' and Exists('$(ModDeployDir)')">
     <ItemGroup>
       <ConfigFiles Include="..\..\config\**\*.*" />
     </ItemGroup>

@@ -1,6 +1,6 @@
 # FairProgression
 
-An SPT 4.0 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed.
+An SPT 4.1.6 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed.
 
 ## The Problem
 
@@ -22,9 +22,19 @@ FairProgression runs **after** all other mods have loaded and:
 
 ## Installation
 
-Extract the release zip in your SPT folder (root). Start the server.
+Extract the release ZIP into your SPT game folder (next to `EscapeFromTarkov.exe`). The mod installs to `SPT_Runtime/user/mods/FairProgression`. Start the server.
 
-To build from source: `dotnet build csharp/FairProgression/FairProgression.csproj -c Release`
+When upgrading, back up your `config/config.jsonc` before extracting the ZIP, then restore it to keep your settings. The config format is unchanged. For SPT 4.0.13, keep using FairProgression 1.0.0.
+
+### Build from source
+
+Requires the .NET 10 SDK and an SPT 4.1.6 installation. Set `SPT_DIR` to its `SPT_Runtime` directory, or pass it explicitly:
+
+```powershell
+dotnet build csharp/FairProgression/FairProgression.csproj -c Release -p:SPT_DIR="C:/Games/SPT-4.1/SPT_Runtime"
+```
+
+The DLL and default config are written to `csharp/FairProgression/bin/Release/net10.0`. Builds do not deploy automatically. Add `-p:DeployOnBuild=true` to copy them into an existing mod installation (this also replaces its config).
 
 ## Configuration
 
@@ -143,10 +153,10 @@ When a quest's difficulty-estimated level exceeds its XP-estimated level by more
 
 ## Compatibility
 
-- **SPT 4.0** (.NET 9.0)
+- **SPT 4.1.6** (.NET 10.0); declares compatibility with 4.1.6 and later 4.1.x patches
 - Compatible with any mod that adds quests (TarkovTradingCards, custom traders, quest overhauls, etc.)
 - Detects QuestsExtended placeholder conditions (dist >= 5555m) and ignores them
-- Must load **after** all quest mods — uses `PostSptModLoader` phase (priority 1.1M+)
+- Rebalances during `PostLoad` at priority `PostLoad + 999`; quest mods must add their quests before this point
 
 ## License
 
