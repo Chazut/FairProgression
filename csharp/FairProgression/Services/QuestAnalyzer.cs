@@ -38,7 +38,7 @@ public static class QuestAnalyzer
             var name = ResolveQuestName(idStr, quest.QuestName, locales);
             var traderId = quest.TraderId.ToString();
 
-            var difficulty = DifficultyEstimator.EstimateDifficulty(quest);
+            var difficulty = DifficultyEstimator.EstimateDifficulty(quest, out var mainObjective);
 
             result.Add(new QuestInfo
             {
@@ -49,6 +49,7 @@ public static class QuestAnalyzer
                 IsVanilla = VanillaQuestSnapshot.IsVanilla(idStr),
                 MinLevel = minLevel,
                 DifficultyScore = difficulty,
+                MainObjective = mainObjective,
                 OriginalXp = xpReward,
                 ScaledXp = xpReward,
                 PrerequisiteQuestIds = prereqIds

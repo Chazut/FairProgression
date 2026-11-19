@@ -4,7 +4,7 @@ using SemVerRange = SemanticVersioning.Range;
 
 namespace FairProgression.Mod;
 
-public sealed record FairProgressionMetadata : IModMetadata
+public sealed record FairProgressionMetadata : IModMetadata, SPTarkov.Server.Web.IModBlazorMetadata
 {
     public string ModGuid { get; init; } = "com.chazut.fairprogression";
     public string Name { get; init; } = "FairProgression";
@@ -16,5 +16,8 @@ public sealed record FairProgressionMetadata : IModMetadata
     public List<string>? Incompatibilities { get; init; }
     public Dictionary<string, SemVerRange>? ModDependencies { get; init; }
     public string? Url { get; init; } = "https://github.com/Chazut/FairProgression";
+    public string? WWWRootUrl { get; init; }
+    public string? HomePage { get; init; } = "/fairprogression";
+    public string? HomePageDescription { get; init; } = "Preview and configure quest XP rewards";
     public string License { get; init; } = "MIT";
 }

@@ -1,3 +1,5 @@
+<img src="branding/fair-progression.png" alt="" width="84" />
+
 # FairProgression
 
 An SPT 4.1.6 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed.
@@ -38,13 +40,22 @@ The DLL and default config are written to `csharp/FairProgression/bin/Release/ne
 
 ## Configuration
 
-Edit `config/config.jsonc`:
+Open **FairProgression** in the SPT web interface, or go to `/fairprogression` on your SPT server. Move **Keep extra quest XP** to preview changes using your loaded quests. A bracket containing 100,000 vanilla XP and 80,000 extra XP has a budget of 120,000 XP when set to 25%. The default target is the vanilla budget.
+
+Select a level bracket and a trader to see original and final rewards. The chart shows the actual total after rounding and any minimum reward. Quests above the last bracket keep their original rewards. Under **Advanced settings**, you can protect vanilla quests, change the reward minimum and level brackets, or adjust difficulty boosts and diagnostics. Save and restart the SPT server to apply the changes.
+
+Older configs that protect vanilla rewards keep their previous formula until you move the slider or select **Use the displayed budget**.
+
+The same settings are available in `config/config.jsonc`:
 
 ```jsonc
 {
   // "scale_all" — reduce ALL quest XP proportionally (vanilla + modded)
   // "scale_modded_only" — only reduce modded quest XP
   "mode": "scale_all",
+
+  // Percentage of extra quest XP to keep (0-100)
+  "extra_xp_percent": 0,
 
   // Level brackets for XP budget calculation.
   //   "trader" — auto-compute from vanilla trader loyalty level requirements

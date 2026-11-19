@@ -1,5 +1,5 @@
 {
-  // FairProgression — Quest XP Rebalancer for SPT 4.0
+  // FairProgression — Quest XP Rebalancer for SPT 4.1
   // Automatically scales quest XP rewards to preserve the vanilla progression curve
   // when modded quests are installed.
 
@@ -9,6 +9,9 @@
   //   "scale_modded_only" — only reduce modded quest XP, leave vanilla rewards untouched.
   //                         Modded quests absorb the full reduction.
   "mode": "scale_all",
+
+  // Share of extra quest XP to keep in each bracket (0 to 100 percent).
+  "extra_xp_percent": 0,
 
   // Level brackets for XP budget calculation.
   //   "trader" — auto-compute from vanilla trader loyalty level requirements.

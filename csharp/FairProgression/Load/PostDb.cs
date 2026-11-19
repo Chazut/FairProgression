@@ -8,9 +8,9 @@ using FairProgression.Services;
 namespace FairProgression.Load;
 
 /// <summary>
-/// Main orchestrator. Runs in the PostLoad phase — the very last named phase in 4.1 —
+/// Main orchestrator. Runs in the PostLoad phase â€” the very last named phase in 4.1 â€”
 /// to ensure ALL mods have finished adding their quests.
-/// 4.1 phase order: Preload (100k) → GameCallbacks (200k) → ... → PostLoad (1M).
+/// 4.1 phase order: Preload (100k) â†’ GameCallbacks (200k) â†’ ... â†’ PostLoad (1M).
 /// PostLoad + 999 keeps the old "after everyone else" contract: quest-injecting mods
 /// run at lower offsets (e.g. TTC injects its quests at PostLoad + 50, MissionControl
 /// runs at PostLoad + 100), so their quests are in the DB before we rebalance.
@@ -42,7 +42,7 @@ public sealed class PostDb : IOnLoad
 
         if (VanillaQuestSnapshot.Ids.Count == 0)
         {
-            _logger.Warning("[FairProgression] Vanilla snapshot is empty — was CaptureVanilla loaded? Aborting.");
+            _logger.Warning("[FairProgression] Vanilla snapshot is empty â€” was CaptureVanilla loaded? Aborting.");
             return Task.CompletedTask;
         }
 
@@ -65,40 +65,30 @@ public sealed class PostDb : IOnLoad
             var globalsPath = Path.Combine(sptRoot, "SPT_Data", "database", "globals.json");
             expTable = ExpTableLoader.LoadFromFile(globalsPath);
         }
-        catch { /* exp_table is optional — parallel chain boost will be skipped */ }
+        catch { /* exp_table is optional â€” parallel chain boost will be skipped */ }
 
         // Analyze all quests
         var questInfos = QuestAnalyzer.Analyze(quests, locales, expTable);
 
+        var snapshot = new ProgressionSnapshot(questInfos, BracketResolver.Resolve("trader", sptRoot));
+        ProgressionSnapshot.Publish(snapshot);
         var moddedCount = questInfos.Count(q => !q.IsVanilla);
         if (moddedCount == 0)
         {
-            _logger.Info("[FairProgression] No modded quests detected — nothing to rebalance");
+            _logger.Info("[FairProgression] No modded quests detected â€” nothing to rebalance");
             return Task.CompletedTask;
         }
 
-        // Buff under-rewarded quests BEFORE computing brackets,
-        // so the buffed XP is included in the budget calculation
-        var buffed = 0;
-        if (config.BuffUnderRewarded)
-        {
-            var vanillaXpPerLevel = QuestAnalyzer.BuildVanillaXpPerLevel(questInfos);
-            buffed = XPScaler.ApplyBuff(questInfos, quests, vanillaXpPerLevel, config.BuffGapThreshold, config.DryRun);
-        }
-
-        // Resolve level brackets (from trader loyalty levels or manual config)
-        var levelBrackets = BracketResolver.Resolve(config.LevelBrackets, sptRoot);
-
-        // Compute brackets and coefficients (now includes buffed XP)
-        var brackets = XPBudgetCalculator.ComputeBrackets(questInfos, levelBrackets, config.MinCoefficient);
-
-        // Apply scaling (reduce over-rewarded)
-        var modified = XPScaler.Apply(questInfos, brackets, quests, config.Mode, config.DryRun);
+        var (planned, brackets) = snapshot.Preview(config);
+        if (!config.DryRun)
+            XPScaler.ApplyRewards(planned, quests);
+        var modified = planned.Count(q => q.ScaledXp != q.BaseXp);
+        var buffed = planned.Count(q => q.PreBuffXp > 0 && q.BracketIndex >= 0);
 
         // Dashboard
         if (config.EnableDashboard)
         {
-            Dashboard.Print(_logger, config, questInfos, brackets, quests);
+            Dashboard.Print(_logger, config, planned, brackets, quests);
         }
 
         var action = config.DryRun ? "would modify" : "scaled";

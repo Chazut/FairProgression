@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -22,8 +22,15 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <EmbeddedResource Include="Web/Settings.css" LogicalName="FairProgression.Settings.css" />
+    <EmbeddedResource Include="../../branding/fair-progression.svg" LogicalName="FairProgression.Icon.svg" />
+  </ItemGroup>
+
   <!-- SPT 4.1.6 server references (SPT_DIR points to SPT_Runtime) -->
   <ItemGroup Condition="'$(SPT_DIR)' != ''">
+    <Reference Include="SPTarkov.Server.Web" HintPath="$(SPT_DIR)/SPTarkov.Server.Web.dll" Private="false" />
     <Reference Include="SPTarkov.Server.Core">
       <HintPath>$(SPT_DIR)\SPTarkov.Server.Core.dll</HintPath>
       <Private>false</Private>

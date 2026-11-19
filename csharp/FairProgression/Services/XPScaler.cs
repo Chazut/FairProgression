@@ -10,91 +10,59 @@ namespace FairProgression.Services;
 /// </summary>
 public static class XPScaler
 {
-    /// <summary>
-    /// Scale quest XP rewards based on bracket coefficients.
-    /// Returns the number of quests modified.
-    /// </summary>
-    public static int Apply(
-        List<QuestInfo> quests,
-        List<BracketSummary> brackets,
-        Dictionary<MongoId, Quest> dbQuests,
-        string mode,
-        bool dryRun)
+    public static void CalculateRewards(List<QuestInfo> quests, List<BracketSummary> brackets, FairProgressionConfig config)
     {
-        var modified = 0;
+        foreach (var bracket in brackets)
+            bracket.TotalXpAfter = 0;
 
-        foreach (var questInfo in quests)
+        foreach (var quest in quests)
         {
-            if (questInfo.OriginalXp <= 0)
+            quest.ScaledXp = quest.BaseXp;
+            if (quest.BracketIndex < 0)
                 continue;
 
-            // Quest above all brackets (e.g., lvl 50+) — no scaling
-            if (questInfo.BracketIndex < 0)
-                continue;
-
-            var bracket = brackets[questInfo.BracketIndex];
-            if (bracket.Coefficient >= 1.0)
-                continue;
-
-            // In "scale_modded_only" mode, skip vanilla quests
-            if (mode == "scale_modded_only" && questInfo.IsVanilla)
-                continue;
-
-            var scaledXp = (int)Math.Round(questInfo.OriginalXp * bracket.Coefficient);
-            scaledXp = Math.Max(1, scaledXp); // Never reduce to 0
-            questInfo.ScaledXp = scaledXp;
-
-            if (!dryRun && dbQuests.TryGetValue(new MongoId(questInfo.Id), out var dbQuest))
-            {
-                SetXpReward(dbQuest, scaledXp);
-            }
-
-            modified++;
+            var bracket = brackets[quest.BracketIndex];
+            bool eligible = quest.OriginalXp > 0 && !(quest.IsVanilla && config.Mode == "scale_modded_only");
+            // Earlier builds applied buffs only when this bracket was actually scaled.
+            if (eligible && (bracket.Coefficient < 1 || config.ExtraXpPercent > 0))
+                quest.ScaledXp = Math.Max(1, (int)Math.Round(quest.OriginalXp * bracket.Coefficient));
+            bracket.TotalXpAfter += quest.ScaledXp;
         }
-
-        // For "scale_modded_only" mode, recalculate bracket coefficients to reflect
-        // that only modded quests were scaled
-        if (mode == "scale_modded_only")
-        {
-            RecalcBracketTotals(quests, brackets);
-        }
-
-        return modified;
     }
 
-    private static void SetXpReward(Quest quest, int newXp)
+    public static void ApplyRewards(List<QuestInfo> quests, Dictionary<MongoId, Quest> database)
     {
-        if (quest.Rewards?.TryGetValue("Success", out var rewards) != true)
-            return;
-
-        if (rewards == null) return;
-
-        foreach (var reward in rewards)
+        foreach (var planned in quests)
         {
-            if (reward.Type == RewardType.Experience)
+            if (planned.ScaledXp == planned.BaseXp || !database.TryGetValue(new MongoId(planned.Id), out var quest))
+                continue;
+
+            var rewards = quest.Rewards?.GetValueOrDefault("Success");
+            if (rewards == null) continue;
+            // Allocate the planned total across every XP entry, including quests from custom traders.
+            long currentTotal = rewards.Where(r => r.Type == RewardType.Experience).Sum(r => (long)(r.Value ?? 0));
+            if (currentTotal <= 0 || currentTotal == planned.ScaledXp) continue;
+            long originalSum = 0, assigned = 0;
+            foreach (var reward in rewards.Where(r => r.Type == RewardType.Experience))
             {
-                reward.Value = newXp;
+                originalSum += (int)(reward.Value ?? 0);
+                var next = (long)Math.Round((double)originalSum * planned.ScaledXp / currentTotal);
+                reward.Value = (int)(next - assigned);
+                assigned = next;
             }
         }
     }
 
-    /// <summary>
-    /// Recalculate bracket after totals based on actual scaled values.
-    /// Used for "scale_modded_only" mode where coefficients are not applied uniformly.
-    /// </summary>
     /// <summary>
     /// Buff under-rewarded modded quests: when difficulty suggests a much higher level
     /// than the XP reward, increase the XP to match the vanilla median for the difficulty level.
     /// Returns the number of quests buffed.
     /// </summary>
-    public static int ApplyBuff(
+    public static void ApplyBuff(
         List<QuestInfo> quests,
-        Dictionary<MongoId, Quest> dbQuests,
         List<(int medianXp, int level)> vanillaXpPerLevel,
-        int gapThreshold,
-        bool dryRun)
+        int gapThreshold)
     {
-        var buffed = 0;
 
         foreach (var q in quests)
         {
@@ -106,26 +74,22 @@ public static class XPScaler
                 continue;
 
             // Use midpoint between XP level and difficulty level as target
-            // (not the full difficulty level — avoids over-buffing)
+            // (not the full difficulty level â€” avoids over-buffing)
             var midLevel = (q.LevelFromXp + q.LevelFromDifficulty) / 2;
             var targetXp = LevelToXp(midLevel, vanillaXpPerLevel);
 
             // Cap: never more than 2x the original XP
-            targetXp = Math.Min(targetXp, q.OriginalXp * 2);
+            targetXp = Math.Min(targetXp, (int)Math.Min(int.MaxValue, (long)q.OriginalXp * 2));
 
             if (targetXp <= q.OriginalXp)
                 continue;
 
-            // Buff runs before scaling — update OriginalXp so brackets account for it.
-            // ScaledXp will be set later by Apply().
+            // Buff runs before scaling â€” update OriginalXp so brackets account for it.
+            // The bracket budget then determines the final reward.
             q.PreBuffXp = q.OriginalXp;
             q.OriginalXp = targetXp;
             q.ScaledXp = targetXp;
-
-            buffed++;
         }
-
-        return buffed;
     }
 
     /// <summary>
@@ -152,14 +116,4 @@ public static class XPScaler
         return bestXp;
     }
 
-    private static void RecalcBracketTotals(List<QuestInfo> quests, List<BracketSummary> brackets)
-    {
-        foreach (var bracket in brackets)
-            bracket.TotalXpAfter = 0;
-
-        foreach (var q in quests.Where(q => q.BracketIndex >= 0))
-        {
-            brackets[q.BracketIndex].TotalXpAfter += q.ScaledXp;
-        }
-    }
 }

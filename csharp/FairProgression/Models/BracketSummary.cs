@@ -12,6 +12,9 @@ public sealed class BracketSummary
     public long VanillaXp { get; set; }
     public int ModdedQuestCount { get; set; }
     public long ModdedXp { get; set; }
+    public long RawModdedXp { get; set; }
+    public long TargetXp { get; set; }
+    public bool FloorApplied { get; set; }
     public long TotalXpBefore { get; set; }
     public long TotalXpAfter { get; set; }
     public double Coefficient { get; set; } = 1.0;

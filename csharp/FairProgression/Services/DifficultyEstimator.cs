@@ -16,8 +16,11 @@ public static class DifficultyEstimator
     // These are tracked by the BepInEx plugin, not by the server.
     private const double QePlaceholderDistance = 5555;
 
-    public static int EstimateDifficulty(Quest quest)
+    public static int EstimateDifficulty(Quest quest) => EstimateDifficulty(quest, out _);
+
+    public static int EstimateDifficulty(Quest quest, out string? mainObjective)
     {
+        mainObjective = null;
         if (quest.Conditions?.AvailableForFinish == null)
             return 0;
 
@@ -47,6 +50,10 @@ public static class DifficultyEstimator
             }
         }
 
+        var strongest = scores.IndexOf(scores.Max());
+        if (scores[strongest] > 0)
+            mainObjective = DescribeObjective(quest.Conditions.AvailableForFinish[strongest]);
+
         // Remove zeros and sort descending
         scores = scores.Where(s => s > 0).OrderByDescending(s => s).ToList();
         if (scores.Count == 0) return 0;
@@ -63,6 +70,30 @@ public static class DifficultyEstimator
         total += Math.Min(additional, additionalCap);
 
         return (int)Math.Round(total);
+    }
+
+    private static string DescribeObjective(QuestCondition condition)
+    {
+        if (condition.ConditionType == "CounterCreator" && condition.Type is "Elimination" or "Kills")
+        {
+            var roles = condition.Counter?.Conditions?
+                .Where(c => c.ConditionType == "Kills" && c.SavageRole != null)
+                .SelectMany(c => c.SavageRole!);
+            return roles?.Any(r => r.StartsWith("boss", StringComparison.OrdinalIgnoreCase)) == true
+                ? "Boss elimination" : "Elimination objective";
+        }
+
+        return condition.ConditionType switch
+        {
+            "HandoverItem" => condition.OnlyFoundInRaid == true ? "Found-in-raid handover" : "Item handover",
+            "HideoutArea" => "Hideout upgrade",
+            "TraderLoyalty" => "Trader loyalty requirement",
+            "WeaponAssembly" => "Weapon assembly",
+            "Skill" => "Skill requirement",
+            "FindItem" => "Item search",
+            "PlaceBeacon" or "LeaveItemAtLocation" => "Item placement",
+            _ => "Quest objectives"
+        };
     }
 
     private static double ScoreCondition(QuestCondition cond)

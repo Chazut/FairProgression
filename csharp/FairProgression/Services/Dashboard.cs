@@ -21,9 +21,9 @@ public static class Dashboard
     {
         var vanillaCount = quests.Count(q => q.IsVanilla);
         var moddedCount = quests.Count(q => !q.IsVanilla);
-        var vanillaOriginalXp = quests.Where(q => q.IsVanilla).Sum(q => (long)q.OriginalXp);
+        var vanillaOriginalXp = quests.Where(q => q.IsVanilla).Sum(q => (long)q.BaseXp);
         var vanillaScaledXp = quests.Where(q => q.IsVanilla).Sum(q => (long)q.ScaledXp);
-        var moddedOriginalXp = quests.Where(q => !q.IsVanilla).Sum(q => (long)q.OriginalXp);
+        var moddedOriginalXp = quests.Where(q => !q.IsVanilla).Sum(q => (long)q.BaseXp);
         var moddedScaledXp = quests.Where(q => !q.IsVanilla).Sum(q => (long)q.ScaledXp);
         var totalOriginalXp = vanillaOriginalXp + moddedOriginalXp;
         var totalScaledXp = vanillaScaledXp + moddedScaledXp;
@@ -31,7 +31,7 @@ public static class Dashboard
         logger.Info($"{Tag} {"",1}");
         logger.Info($"{Tag} ================================================================");
         logger.Info($"{Tag}  XP Rebalancing Dashboard{(config.DryRun ? "  [DRY RUN]" : "")}");
-        logger.Info($"{Tag}  Mode: {config.Mode}");
+        logger.Info($"{Tag}  Mode: {config.Mode}, extra XP retained: {config.ExtraXpPercent ?? 0}%");
         logger.Info($"{Tag} ================================================================");
         logger.Info($"{Tag}  Quests: {quests.Count} total ({vanillaCount} vanilla, {moddedCount} modded)");
         logger.Info($"{Tag}  Vanilla quest XP: {FormatXp(vanillaOriginalXp)} -> {FormatXp(vanillaScaledXp)} ({FormatPct(vanillaScaledXp, vanillaOriginalXp)})");
@@ -46,21 +46,21 @@ public static class Dashboard
         {
             logger.Info(
                 $"{Tag}  {b.Label,-10} {b.VanillaQuestCount,6} {FormatXp(b.VanillaXp),10} " +
-                $"{b.ModdedQuestCount,6} {FormatXp(b.ModdedXp),10} " +
-                $"{FormatXp(b.TotalXpBefore),10} {b.Coefficient,7:F3} {FormatXp(b.TotalXpAfter),10}");
+                $"{b.ModdedQuestCount,6} {FormatXp(b.RawModdedXp),10} " +
+                $"{FormatXp(b.VanillaXp + b.RawModdedXp),10} {b.Coefficient,7:F3} {FormatXp(b.TotalXpAfter),10}");
         }
 
         // Show unscaled quests (above all brackets)
         var unscaledQuests = quests.Where(q => q.BracketIndex < 0).ToList();
         if (unscaledQuests.Count > 0)
         {
-            var unscaledXp = unscaledQuests.Sum(q => (long)q.OriginalXp);
+            var unscaledXp = unscaledQuests.Sum(q => (long)q.BaseXp);
             var lastBracket = brackets[^1].UpperBound;
             logger.Info(
                 $"{Tag}  {$"{lastBracket + 1}+",-10} {unscaledQuests.Count(q => q.IsVanilla),6} " +
-                $"{FormatXp(unscaledQuests.Where(q => q.IsVanilla).Sum(q => (long)q.OriginalXp)),10} " +
+                $"{FormatXp(unscaledQuests.Where(q => q.IsVanilla).Sum(q => (long)q.BaseXp)),10} " +
                 $"{unscaledQuests.Count(q => !q.IsVanilla),6} " +
-                $"{FormatXp(unscaledQuests.Where(q => !q.IsVanilla).Sum(q => (long)q.OriginalXp)),10} " +
+                $"{FormatXp(unscaledQuests.Where(q => !q.IsVanilla).Sum(q => (long)q.BaseXp)),10} " +
                 $"{FormatXp(unscaledXp),10} {"---",7} {FormatXp(unscaledXp),10}");
         }
 
@@ -90,7 +90,7 @@ public static class Dashboard
 
             foreach (var group in moddedByTrader)
             {
-                var groupXp = group.Sum(q => (long)q.OriginalXp);
+                var groupXp = group.Sum(q => (long)q.BaseXp);
                 var groupScaled = group.Sum(q => (long)q.ScaledXp);
                 logger.Info($"{Tag} {"",1}");
                 logger.Info($"{Tag}  --- {group.Key} ({group.Count()} quests, {FormatXp(groupXp)} XP -> {FormatXp(groupScaled)}) ---");
@@ -103,7 +103,7 @@ public static class Dashboard
                     var coeff = q.BracketIndex >= 0 ? $"{brackets[q.BracketIndex].Coefficient,7:F3}" : "  ---  ";
                     logger.Info(
                         $"{Tag}  {name,-50} {bracketLabel,8} {q.EstimatedCompletionLevel,4} " +
-                        $"{q.DifficultyScore,5} {q.OriginalXp,8} {q.ScaledXp,8} {coeff}");
+                        $"{q.DifficultyScore,5} {q.BaseXp,8} {q.ScaledXp,8} {coeff}");
                 }
             }
         }

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128">
+  <title>FairProgression</title>
+  <rect x="2" y="2" width="124" height="124" rx="26" fill="#0B0F1A"/>
+  <path d="M14 98c31 5 76-25 98-65M23 109c27 1 67-23 84-45" fill="none" stroke="#243744" stroke-width="2"/>
+  <path d="M19 91h18c7 0 9-4 12-12l3-7c2-5 5-7 11-7h6c5 0 9-3 12-10l4-8c2-4 5-7 9-10" fill="none" stroke="#4FD1C5" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="98" cy="33" r="12" fill="#FFB454"/>
+  <path d="M82 41c-2-3 4-8 12-12m18-3c4 1 1 6-7 11-9 5-20 8-23 4" fill="none" stroke="#FFCF86" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M28 31v7m-3.5-3.5h7m72 49v5m-2.5-2.5h5" stroke="#96A9B6" stroke-width="2" stroke-linecap="round"/>
+</svg>

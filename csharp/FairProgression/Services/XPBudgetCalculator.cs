@@ -12,7 +12,7 @@ public static class XPBudgetCalculator
     /// Build bracket summaries and compute scaling coefficients.
     /// Quests estimated above the last bracket are left untouched (no scaling).
     /// </summary>
-    public static List<BracketSummary> ComputeBrackets(List<QuestInfo> quests, List<int> levelBrackets, double minCoefficient)
+    public static List<BracketSummary> ComputeBrackets(List<QuestInfo> quests, List<int> levelBrackets, double minCoefficient, int? extraXpPercent = null, string mode = "scale_all")
     {
         var brackets = BuildBrackets(levelBrackets);
 
@@ -38,14 +38,18 @@ public static class XPBudgetCalculator
             {
                 bracket.ModdedQuestCount++;
                 bracket.ModdedXp += quest.OriginalXp;
+                bracket.RawModdedXp += quest.BaseXp;
             }
 
             bracket.TotalXpBefore += quest.OriginalXp;
         }
 
-        // Compute coefficients: target is vanilla XP only
+        // The optional difficulty buff affects allocation, not the amount of extra XP requested.
+        double fraction = Math.Clamp(extraXpPercent ?? 0, 0, 100) / 100d;
         foreach (var bracket in brackets)
         {
+            double target = bracket.VanillaXp + fraction * bracket.RawModdedXp;
+            bracket.TargetXp = (long)Math.Round(target);
             if (bracket.TotalXpBefore <= 0 || bracket.ModdedXp <= 0)
             {
                 bracket.Coefficient = 1.0;
@@ -53,7 +57,11 @@ public static class XPBudgetCalculator
             }
             else
             {
-                var rawCoeff = (double)bracket.VanillaXp / bracket.TotalXpBefore;
+                var protectVanilla = mode == "scale_modded_only" && extraXpPercent.HasValue;
+                var rawCoeff = protectVanilla
+                    ? (target - bracket.VanillaXp) / bracket.ModdedXp
+                    : target / bracket.TotalXpBefore;
+                bracket.FloorApplied = rawCoeff < minCoefficient;
                 bracket.Coefficient = Math.Max(rawCoeff, minCoefficient);
                 bracket.TotalXpAfter = (long)(bracket.TotalXpBefore * bracket.Coefficient);
             }

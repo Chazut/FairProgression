@@ -2,12 +2,17 @@ using System.Text.Json.Serialization;
 
 namespace FairProgression.Models;
 
-public sealed class FairProgressionConfig
+public sealed record FairProgressionConfig
 {
     [JsonPropertyName("mode")]
     public string Mode { get; set; } = "scale_all";
 
+    // Missing in older files. Preserve their protected-vanilla formula until a budget is selected.
+    [JsonPropertyName("extra_xp_percent")]
+    public int? ExtraXpPercent { get; set; }
+
     [JsonPropertyName("level_brackets")]
+    [JsonConverter(typeof(LevelBracketsConverter))]
     public string LevelBrackets { get; set; } = "trader";
 
     [JsonPropertyName("min_coefficient")]

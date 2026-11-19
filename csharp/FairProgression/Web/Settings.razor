@@ -1,0 +1,137 @@
+@page "/fairprogression"
+@using Microsoft.AspNetCore.Components.Web
+@using FairProgression.Models
+@namespace FairProgression.Web
+
+<PageTitle>FairProgression | Quest XP</PageTitle>
+<style>@((MarkupString)Styles)</style>
+<main class="fp-shell">
+    <header class="fp-head">
+        <img src="@Icon" width="62" height="62" alt="" />
+        <div><h1>FairProgression</h1><p>Quest XP settings</p></div>
+    </header>
+
+    @if (document == null)
+    {
+        <p role="alert">@status</p>
+        <button @onclick="Reload">Reload settings</button>
+    }
+    else
+    {
+        <section class="fp-card fp-control">
+            <div>
+                <h2><label for="fp-share">Keep extra quest XP</label></h2>
+                <p>Choose how much of the XP added by quest mods to keep in each level bracket.</p>
+            </div>
+            <output for="fp-share">@Share<small>%</small></output>
+            <div class="fp-track">
+                <input id="fp-share" type="range" min="0" max="100" step="1" @bind="Share" @bind:event="oninput" />
+                <div><span>Vanilla budget</span><span>Keep all extra XP</span></div>
+            </div>
+            @if (LegacyMode)
+            {
+                <p class="fp-note">Your saved config uses the previous formula for protected vanilla rewards.
+                    <button class="fp-text" @onclick="UseBudget">Use the displayed budget</button></p>
+            }
+        </section>
+
+        @if (plan != null)
+        {
+            <section class="fp-card">
+                <div class="fp-heading"><h2>XP by level bracket</h2><span>@Number(plan.Quests.Count) quests</span></div>
+                <div class="fp-key">
+                    <span><i class="fp-vanilla"></i>Vanilla</span><span><i class="fp-mods"></i>With mods</span><span><i class="fp-result"></i>After balancing</span>
+                </div>
+                <div class="fp-brackets">
+                    @foreach (var row in rows)
+                    {
+                        <button type="button" class="fp-row" aria-expanded="@(selection == row.Index ? "true" : "false")"
+                                aria-controls="fp-quests" @onclick="() => Select(row.Index)">
+                            <span class="fp-level"><b>Lv. @row.Label</b><small>@row.Count quests</small></span>
+                            <span class="fp-bars" aria-hidden="true">
+                                <i class="fp-vanilla" style="@Width(row.Vanilla)"></i>
+                                <i class="fp-mods" style="@Width(row.Before)"></i>
+                                <i class="fp-result" style="@Width(row.After)"></i>
+                            </span>
+                            <span class="fp-values"><small>Vanilla @Number(row.Vanilla) · With mods @Number(row.Before)</small>
+                                <b>@Number(row.After) XP</b>
+                                @if (row.Floor) { <small class="fp-warn">Reward minimum applies · Target @Number(row.Target)</small> }
+                                else if (row.Index < 0) { <small>Above the last bracket</small> }
+                                else { <small>Target @Number(row.Target)</small> }
+                            </span>
+                            <span class="fp-chevron" aria-hidden="true">@(selection == row.Index ? "−" : "+")</span>
+                        </button>
+                    }
+                </div>
+                <div id="fp-quests">
+                    @if (selection.HasValue)
+                    {
+                        <div class="fp-heading fp-detail"><h3>Quests · Lv. @rows.First(r => r.Index == selection).Label</h3>
+                            <label>Trader
+                                <select @bind="trader">
+                                    <option value="">All traders</option>
+                                    @foreach (var name in Traders) { <option value="@name">@name</option> }
+                                </select>
+                            </label>
+                        </div>
+                        @if (SelectedQuests.Count == 0) { <p>No quests in this bracket.</p> }
+                        else
+                        {
+                            <div class="fp-table"><table>
+                                <thead><tr><th>Quest</th><th>Original XP</th><th>Final XP</th><th>Adjustment</th></tr></thead>
+                                <tbody>
+                                    @foreach (var q in SelectedQuests.Where(q => trader.Length == 0 || q.TraderName == trader))
+                                    {
+                                        <tr><th scope="row">@q.Name<small>@q.TraderName · @(q.IsVanilla ? "Vanilla" : "Modded")</small></th>
+                                            <td>@Number(q.BaseXp)</td><td>@Number(q.ScaledXp)</td><td>@Explain(q)</td></tr>
+                                    }
+                                </tbody>
+                            </table></div>
+                        }
+                    }
+                </div>
+            </section>
+        }
+        else if (error == null)
+        {
+            <p class="fp-card">The preview will appear after the server finishes analyzing quests.</p>
+        }
+
+        <details class="fp-card fp-options">
+            <summary>Advanced settings</summary>
+            <div class="fp-grid">
+                <label class="fp-field">Quests to rebalance
+                    <select @bind="Mode">
+                        <option value="scale_all">Vanilla and modded quests</option>
+                        <option value="scale_modded_only">Modded quests only</option>
+                    </select>
+                </label>
+                <label class="fp-field">Minimum reward (%)
+                    <input type="number" min="0" max="100" step="any" @bind="floorPercent" @bind:after="Refresh" />
+                </label>
+                <label class="fp-check"><input type="checkbox" @bind="automatic" @bind:after="Refresh" /> Use trader loyalty levels for brackets</label>
+                @if (!automatic)
+                {
+                    <label class="fp-field">Upper level of each bracket
+                        <input type="text" @bind="manual" @bind:event="oninput" @bind:after="Refresh" placeholder="12, 20, 32, 42" />
+                    </label>
+                }
+                <label class="fp-check"><input type="checkbox" @bind="draft.BuffUnderRewarded" @bind:after="Refresh" /> Boost difficult, under-rewarded modded quests</label>
+                @if (draft.BuffUnderRewarded)
+                {
+                    <label class="fp-field">Minimum difficulty gap (levels)
+                        <input type="number" min="0" step="1" @bind="gap" @bind:after="Refresh" />
+                    </label>
+                }
+                <label class="fp-check"><input type="checkbox" @bind="draft.DryRun" @bind:after="Refresh" /> Dry run (calculate rewards only)</label>
+                <label class="fp-check"><input type="checkbox" @bind="draft.EnableDashboard" @bind:after="Refresh" /> Print the XP summary in server logs</label>
+                <label class="fp-check"><input type="checkbox" @bind="draft.Verbose" @bind:after="Refresh" /> Include quest details in the log summary</label>
+            </div>
+        </details>
+        @if (error != null) { <p role="alert" class="fp-alert">@error</p> }
+        <footer class="fp-footer">
+            <div><span role="status">@status</span><small>Saved settings apply on the next server start.</small></div>
+            <button @onclick="Reload">Reload saved</button><button class="fp-primary" disabled="@(error != null)" @onclick="Save">Save settings</button>
+        </footer>
+    }
+</main>
