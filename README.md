@@ -1,174 +1,55 @@
-<img src="branding/fair-progression.png" alt="" width="84" />
-
 # FairProgression
 
-An SPT 4.1.6 server mod that automatically rebalances quest XP rewards to preserve the vanilla progression curve when modded quests are installed.
+<img src="branding/fair-progression.png" alt="FairProgression logo" width="84" />
 
-## The Problem
-
-When you install mods that add quests (custom traders, quest overhauls, etc.), the extra XP from those quests causes you to level up faster than intended. This creates a mismatch: your level is high enough for better gear, but you haven't progressed through the vanilla trader quests to actually unlock it.
-
-## The Solution
-
-FairProgression runs **after** all other mods have loaded and:
-
-1. **Identifies** which quests are vanilla and which are modded (by comparing the in-memory database against the on-disk vanilla quest file)
-2. **Estimates** at which level each quest will realistically be completed, using:
-   - XP reward amount mapped against vanilla quest distributions
-   - Objective difficulty analysis (kill targets, boss fights, hideout requirements, map difficulty, etc.)
-   - Prerequisite chain depth propagation (vanilla + modded)
-   - Parallel chain XP accumulation per trader (e.g., 20 quest themes played simultaneously)
-3. **Buffs up** under-rewarded quests first: when a quest's objectives are significantly harder than its XP reward suggests, increases the XP to match (capped at x2)
-4. **Scales down** over-rewarded quests: assigns quests to level brackets aligned with trader loyalty unlocks and computes a scaling coefficient per bracket so the total quest XP matches the vanilla budget
-5. **Logs** a detailed dashboard of all changes
+Custom traders and quest packs can push your PMC through the early levels before you've earned the trader loyalty to go with them. FairProgression adjusts quest completion XP for each stage of the wipe. The default aims for the vanilla pace, and a slider lets you keep as much of the extra quest XP as you like.
 
 ## Installation
 
-Extract the release ZIP into your SPT game folder (next to `EscapeFromTarkov.exe`). The mod installs to `SPT_Runtime/user/mods/FairProgression`. Start the server.
+1. Download the [release ZIP](https://github.com/Chazut/FairProgression/releases) for **SPT 4.1.6** and extract it next to `EscapeFromTarkov.exe`. The mod runs on the server.
+2. Start the SPT server. FairProgression automatically picks up quests from your installed mods.
+3. To change the defaults, open **FairProgression** in SPT's web menu. Its page is also available at `/fairprogression` on your server.
 
-When upgrading, back up your `config/config.jsonc` before extracting the ZIP, then restore it to keep your settings. The config format is unchanged. For SPT 4.0.13, keep using FairProgression 1.0.0.
+Existing profiles can use FairProgression mid-wipe. It adjusts future quest payouts in memory. XP your PMC has already earned stays on the profile. When upgrading, keep your copy of `SPT_Runtime/user/mods/FairProgression/config/config.jsonc`. For SPT 4.0.13, use the [1.0.0 release](https://github.com/Chazut/FairProgression/releases/tag/1.0.0).
 
-### Build from source
+## Choose your progression pace
 
-Requires the .NET 10 SDK and an SPT 4.1.6 installation. Set `SPT_DIR` to its `SPT_Runtime` directory, or pass it explicitly:
+**Keep extra quest XP** sets how much XP quest packs add to the vanilla total in each level range. Suppose the vanilla quests in one range offer 100,000 XP and a custom trader adds another 80,000 XP.
+
+| Slider | Extra XP kept | Target for that level range |
+| --- | ---: | ---: |
+| 0% (default) | 0 | 100,000 XP |
+| 25% | 20,000 | 120,000 XP |
+| 100% | 80,000 | 180,000 XP |
+
+Open a level range in the preview and select a trader to see each quest's original and final reward. By default, vanilla and modded quests share the adjustment. Select **Advanced settings → Quests to rebalance → Modded quests only** to protect vanilla payouts. In the 25% example, vanilla quests would still pay 100,000 XP and the custom trader's quests would share 20,000 XP.
+
+**Minimum reward** puts a floor under each adjustment. For example, raising it to 50% in that same scenario gives the custom trader's quests at least 40,000 XP, bringing the actual total to 140,000 XP. The preview shows both the target and the result. Choose **Save settings** and restart the server to apply your changes.
+
+If you're upgrading an older config that already protected vanilla rewards, it keeps its previous calculation until you move the slider or select **Use the displayed budget** and save.
+
+## How quests are balanced
+
+- **Level ranges** follow vanilla trader loyalty requirements by default. You can enter your own upper limits in the editor. Quests estimated above the last range keep their original XP.
+- **Quest placement** uses level requirements and prerequisite chains. When a modded quest has no minimum level above 1, its XP and objectives help estimate when you're likely to finish it. Parallel quest chains from the same trader can raise that estimate. A boss kill with weapon restrictions can place a quest later than a simple item handover.
+- **Difficulty boosts** give under-rewarded modded quests a larger share of the budget. By default, a gap of at least five levels between estimated difficulty and XP value qualifies. The boost is capped at twice the original XP before the level range is balanced.
+
+On startup, FairProgression uses the quest IDs in SPT's vanilla database to identify added quests. It balances the quests loaded by `PostLoad + 999`. Restart the server after adding or removing a quest pack to recalculate the rewards.
+
+## Configuration and diagnostics
+
+The web editor and the [JSONC config](config/config.jsonc) use the same settings. For troubleshooting, enable **Dry run** to calculate rewards at startup while the game uses its original payouts. The **XP summary** shows totals per level range in the server log. Turn on quest details to inspect individual adjustments.
+
+## Build and test
+
+From the repository root, use the .NET 10 SDK and point `SPT_DIR` at your SPT 4.1.6 server runtime.
 
 ```powershell
-dotnet build csharp/FairProgression/FairProgression.csproj -c Release -p:SPT_DIR="C:/Games/SPT-4.1/SPT_Runtime"
+$env:SPT_DIR = "C:/Games/SPT-4.1/SPT_Runtime"
+dotnet build csharp/FairProgression/FairProgression.csproj -c Release
+dotnet run --project tests/ProgressionChecks/ProgressionChecks.csproj -c Release
 ```
 
-The DLL and default config are written to `csharp/FairProgression/bin/Release/net10.0`. Builds do not deploy automatically. Add `-p:DeployOnBuild=true` to copy them into an existing mod installation (this also replaces its config).
+The build writes the DLL and default config to `csharp/FairProgression/bin/Release/net10.0/`.
 
-## Configuration
-
-Open **FairProgression** in the SPT web interface, or go to `/fairprogression` on your SPT server. Move **Keep extra quest XP** to preview changes using your loaded quests. A bracket containing 100,000 vanilla XP and 80,000 extra XP has a budget of 120,000 XP when set to 25%. The default target is the vanilla budget.
-
-Select a level bracket and a trader to see original and final rewards. The chart shows the actual total after rounding and any minimum reward. Quests above the last bracket keep their original rewards. Under **Advanced settings**, you can protect vanilla quests, change the reward minimum and level brackets, or adjust difficulty boosts and diagnostics. Save and restart the SPT server to apply the changes.
-
-Older configs that protect vanilla rewards keep their previous formula until you move the slider or select **Use the displayed budget**.
-
-The same settings are available in `config/config.jsonc`:
-
-```jsonc
-{
-  // "scale_all" — reduce ALL quest XP proportionally (vanilla + modded)
-  // "scale_modded_only" — only reduce modded quest XP
-  "mode": "scale_all",
-
-  // Percentage of extra quest XP to keep (0-100)
-  "extra_xp_percent": 0,
-
-  // Level brackets for XP budget calculation.
-  //   "trader" — auto-compute from vanilla trader loyalty level requirements
-  //              (e.g., [12, 20, 32, 42] based on LL2/LL3/LL4 unlock levels)
-  //   [5, 10, ...] — manual JSON array of bracket upper bounds
-  "level_brackets": "trader",
-
-  // Minimum scaling coefficient (never reduce below this ratio)
-  "min_coefficient": 0.25,
-
-  // Buff under-rewarded quests (difficulty >> XP reward), capped at x2
-  "buff_under_rewarded": true,
-
-  // Minimum level gap (difficultyLevel - xpLevel) to trigger a buff
-  "buff_gap_threshold": 5,
-
-  // Print detailed dashboard in server logs
-  "enable_dashboard": true,
-
-  // Calculate and log without modifying anything
-  "dry_run": false,
-
-  // Log every modded quest with difficulty scores + under-rewarded details
-  "verbose": false
-}
-```
-
-## Dashboard Example
-
-```
-[FairProgression] ================================================================
-[FairProgression]  XP Rebalancing Dashboard
-[FairProgression]  Mode: scale_all
-[FairProgression] ================================================================
-[FairProgression]  Quests: 1492 total (558 vanilla, 934 modded)
-[FairProgression]  Vanilla quest XP: 11.0M -> 7.9M (-27.6%)
-[FairProgression]  Modded  quest XP: 24.6M -> 21.4M (-13.1%)
-[FairProgression]
-[FairProgression]  Bracket  Van.Q   Van.XP  Mod.Q   Mod.XP    Total  Coeff     After
-[FairProgression]  -------  -----   ------  -----   ------    -----  -----     -----
-[FairProgression]  1-12       167     2.0M    117    256.1k     2.2M  0.885      2.0M
-[FairProgression]  13-20      145     1.8M    116    578.2k     2.4M  0.754      1.8M
-[FairProgression]  21-32      151     3.2M    193      2.1M     5.3M  0.603      3.2M
-[FairProgression]  33-42       55     1.7M    137      3.3M     5.0M  0.334      1.7M
-[FairProgression]  43+         40     2.4M    371     18.4M    20.8M    ---     20.8M
-[FairProgression]
-[FairProgression]  Buffed 185 under-rewarded quests (+369.0k XP)
-[FairProgression]
-[FairProgression]  Total quest XP: 35.6M -> 29.3M (-17.5%)
-[FairProgression] ================================================================
-```
-
-## How It Works
-
-### Trader-Aligned Level Brackets
-
-By default (`"level_brackets": "trader"`), brackets are auto-computed from vanilla trader loyalty level requirements:
-
-| Bracket | Phase | Trader unlocks |
-|---|---|---|
-| 1-12 | Early game | Before any LL2 |
-| 13-20 | LL2 phase | Therapist 13, Peacekeeper 14, Prapor/Skier/Jaeger 15, Ragman 17, Mechanic 20 |
-| 21-32 | LL3 phase | Jaeger 22, Peacekeeper/Therapist 23-24, Prapor 26, Skier 28, Mechanic 30, Ragman 32 |
-| 33-42 | LL4 phase | Jaeger 33, Therapist/Prapor/Skier 35-38, Mechanic 40, Ragman 42 |
-| 43+ | Endgame | All traders LL4 — no scaling applied |
-
-### Quest Level Estimation
-
-Each quest's "estimated completion level" is the **maximum** of four signals:
-
-| Signal | Description |
-|---|---|
-| **XP reward** | Mapped against vanilla quest XP medians per level |
-| **Difficulty score** | Analyzed from quest objectives (kill count, target type, restrictions, map difficulty, etc.) |
-| **Prerequisite propagation** | Each quest >= max(prereq levels) + 1, applied to vanilla and modded quests |
-| **Parallel chain boost** | Cumulative XP from parallel chains within the same trader, converted to a level floor via the exp table |
-
-### Difficulty Scoring
-
-Quest objectives are scored by analyzing the `AvailableForFinish` conditions:
-
-- **Kill scavs**: 3 + sqrt(count) x 2 (easy)
-- **Kill PMCs**: 7 + sqrt(count) x 2 (moderate)
-- **Kill bosses**: 18 + sqrt(count) x 2 (hard)
-- **Kill restrictions** (headshot, distance, weapon, equipment, night): multiplier +10-25% each
-- **Map difficulty**: Labs +50%, Lighthouse/Labyrinth +30%
-- **Zone restriction**: +20% (may require keys)
-- **One raid (OneSessionOnly)**: +15-100% scaled by base difficulty (kill 20 PMC headshots >> visit 6 zones)
-- **Handover items**: 3 + count x 1.5 (FIR: x1.4), money handovers = trivial
-- **Hideout area**: 8/18/28 for level 1/2/3+
-- **Trader loyalty**: 5/12/25/38 for LL1/2/3/4
-- **Skill level**: 5-30 depending on level
-- **QuestsExtended placeholders** (dist >= 5555m): detected and ignored
-- **FindItem + HandoverItem** in same quest: counted once, not twice
-- Multiple conditions: highest score + 15% of each additional (capped at 50% of highest)
-
-### Under-Rewarded Buff
-
-When a quest's difficulty-estimated level exceeds its XP-estimated level by more than the threshold (default: 5 levels), the XP is increased to the vanilla median for the midpoint level. The buff is capped at x2 the original XP to avoid extreme jumps. Buffs are applied **before** bracket computation so they are included in the XP budget.
-
-### Safe for Existing Profiles
-
-- Only modifies quest XP rewards in memory (not on disk)
-- Already-completed quests are unaffected
-- Adding/removing quest mods: just restart the server, coefficients recalculate automatically
-
-## Compatibility
-
-- **SPT 4.1.6** (.NET 10.0); declares compatibility with 4.1.6 and later 4.1.x patches
-- Compatible with any mod that adds quests (TarkovTradingCards, custom traders, quest overhauls, etc.)
-- Detects QuestsExtended placeholder conditions (dist >= 5555m) and ignores them
-- Rebalances during `PostLoad` at priority `PostLoad + 999`; quest mods must add their quests before this point
-
-## License
-
-MIT
+[Release notes](RELEASE_NOTES_v1.2.0.md) · [Report an issue](https://github.com/Chazut/FairProgression/issues) · [MIT license](LICENSE)
