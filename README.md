@@ -1,6 +1,11 @@
 # FairProgression
 
 <img src="branding/fair-progression.png" alt="FairProgression logo" width="84" />
+<p align="center">
+  <img src="https://img.shields.io/github/stars/Chazut/FairProgression?style=flat-square&label=STARS&color=007ec6" />
+  <img src="https://img.shields.io/github/issues/Chazut/FairProgression?style=flat-square&label=ISSUES&color=44cc11" />
+  <img src="https://img.shields.io/github/downloads/Chazut/FairProgression/total?style=flat-square&label=DOWNLOADS&color=44cc11" />
+</p>
 
 Custom traders and quest packs can push your PMC through the early levels before you've earned the trader loyalty to go with them. FairProgression adjusts quest completion XP for each stage of the wipe. The default aims for the vanilla pace, and a slider lets you keep as much of the extra quest XP as you like.
 
